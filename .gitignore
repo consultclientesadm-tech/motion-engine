@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+.env
+.venv/
+models/
+*.db
+.pytest_cache/
+.ruff_cache/
