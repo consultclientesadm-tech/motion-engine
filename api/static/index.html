@@ -63,20 +63,35 @@
   details summary { cursor: pointer; color: var(--muted); margin: 12px 0 8px; }
   .actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
   .hidden { display: none; }
-  @media (max-width: 600px) { .row, .stats { grid-template-columns: 1fr; } }
+  /* celular: alvos de toque grandes, fonte 16px (o iPhone não dá zoom no campo) */
+  input[type=text], input[type=number], select { font-size: 16px; min-height: 44px; }
+  button { min-height: 44px; }
+  .drop { padding: 22px 14px; }
+  @media (max-width: 600px) {
+    main { padding: 16px 12px 96px; }
+    .row, .stats { grid-template-columns: 1fr; }
+    .stats { grid-template-columns: repeat(3, 1fr); gap: 6px; }
+    .stat { padding: 8px 6px; } .stat b { font-size: 15px; } .stat span { font-size: 11px; }
+    .card { padding: 14px; border-radius: 10px; }
+    #new .actions { position: sticky; bottom: 0; background: var(--card); padding: 10px 0;
+                    margin: 12px -14px -14px; padding: 10px 14px; border-top: 1px solid var(--line);
+                    border-radius: 0 0 10px 10px; }
+    #new .actions button.primary, #result .actions a, #result .actions button { width: 100%; }
+    .jobs li { flex-direction: column; gap: 2px; }
+  }
 </style>
 </head>
 <body>
 <main>
   <h1>Motion Engine</h1>
-  <p class="sub">Página de teste: envie o vídeo de referência e a foto de cada pessoa, gere e confira o resultado.</p>
+  <p class="sub">Envie o vídeo de referência e a foto de cada pessoa. Para testar, use vídeos de até 30 s: ficam prontos em poucos minutos.</p>
 
   <section class="card" id="new">
     <h2>1. Novo vídeo</h2>
     <label>Vídeo de referência <span class="hint">(mp4, mov, mkv, webm)</span></label>
     <div class="drop" id="videoDrop">
       <input type="file" id="videoFile" accept="video/*,.mkv">
-      <div id="videoLabel">Clique ou arraste o vídeo aqui</div>
+      <div id="videoLabel">Toque para escolher o vídeo (ou arraste aqui)</div>
     </div>
 
     <div style="margin-top:18px">
@@ -125,7 +140,7 @@
     <div id="stateText" class="hint"></div>
     <div id="jobErr" class="err"></div>
     <div id="result" class="hidden">
-      <video id="player" controls preload="metadata"></video>
+      <video id="player" controls playsinline preload="metadata"></video>
       <div class="actions"><a id="download"><button class="primary" type="button">Baixar MP4</button></a></div>
     </div>
     <div class="actions">
@@ -197,7 +212,7 @@ $("videoFile").onchange = (e) => {
   videoFile = e.target.files[0] || null;
   $("videoDrop").classList.toggle("has", !!videoFile);
   $("videoLabel").textContent = videoFile
-    ? `${videoFile.name} (${(videoFile.size / 1e6).toFixed(1)} MB)` : "Clique ou arraste o vídeo aqui";
+    ? `${videoFile.name} (${(videoFile.size / 1e6).toFixed(1)} MB)` : "Toque para escolher o vídeo (ou arraste aqui)";
 };
 
 function escapeHtml(s) { return s.replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
