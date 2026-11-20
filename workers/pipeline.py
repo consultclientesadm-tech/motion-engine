@@ -381,8 +381,7 @@ def post_all(ctx: Ctx) -> None:
     with session_scope() as s:
         job = load_job(s, ctx.job_id)
         checkpoint.verify(job, s3.exists)
-        res = (st.output_width, st.output_height) if job.target_resolution == "1080p" \
-            else (st.render_width, st.render_height)
+        res = (st.output_width, st.output_height) if job.target_resolution == "1080p" else (1280, 720)
         todo = [(b.index, b.start_s, b.end_s, b.has_people, b.stage, b.lipsync_key)
                 for b in job.blocks if b.stage not in checkpoint.DONE_FOR_MUX]
         fps, source_key, target = job.fps, job.source_key, job.target_resolution
@@ -402,8 +401,12 @@ def post_all(ctx: Ctx) -> None:
             with spend(ctx.job_id, f"upscale:{idx}", costs.gpu_usd(costs.upscale_block_s(b - a, fps))):
                 out = upscaler.upscale_video(s3.fetch(lip_key, wd / "in.mp4"), wd / "final.mp4", fps)
             new_stage = BlockStage.upscaled
+        elif (st.render_width, st.render_height) != res:  # 720p a partir do render 540p: só redimensiona
+            with spend(ctx.job_id, f"resize:{idx}", costs.cpu_usd(costs.mux_cpu_s(b - a)), cpu=True):
+                out = passthrough(s3.fetch(lip_key, wd / "in.mp4"), wd / "final.mp4", 0, b - a, *res, fps)
+            new_stage = BlockStage.upscaled
         else:
-            out, new_stage = None, BlockStage.upscaled  # 720p: o bloco renderizado já é o final
+            out, new_stage = None, BlockStage.upscaled  # o bloco renderizado já é o final
         key = (s3.upload(out, s3.tmp_key(ctx.job_id, "blocks", str(idx), "final.mp4"), "video/mp4")
                if out else lip_key)
         with session_scope() as s:

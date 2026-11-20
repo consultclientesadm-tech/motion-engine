@@ -25,6 +25,13 @@ def render_block(*, analysis, track_to_char: dict[int, str], avatars: dict[str, 
                "-pix_fmt", "yuv420p", "-video_track_timescale", "90000", "-an", str(out))
         return out, pose
 
+    base = source_block
+    if s.inpaint:  # apaga as pessoas que viram avatar (as outras ficam no quadro)
+        from workers.inpaint.clean import clean_block
+        base = workdir / "clean.mp4"
+        clean_block(source_block=source_block, analysis=analysis, keep_tracks=set(track_to_char),
+                    src_w=src_w, src_h=src_h, out=base)
+
     frames_dir = workdir / "frames"
     frames_dir.mkdir(parents=True, exist_ok=True)
     cfg = {
@@ -39,7 +46,7 @@ def render_block(*, analysis, track_to_char: dict[int, str], avatars: dict[str, 
     run([s.blender_bin, "-b", "--factory-startup", "--python", str(BLENDER_SCRIPT), "--", str(cfg_path)],
         timeout=6 * 3600)
 
-    ffmpeg("-i", str(source_block),
+    ffmpeg("-i", str(base),
            "-framerate", f"{fps}", "-start_number", "1", "-i", str(frames_dir / "frame_%04d.png"),
            "-filter_complex", f"[1:v]scale={s.render_width}:{s.render_height}[fg];"
                               f"[0:v][fg]overlay=0:0:format=auto:shortest=1,format=yuv420p",

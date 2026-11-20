@@ -3,7 +3,7 @@
 Troca as pessoas de um clipe longo (20 a 40 min) por personagens criados do zero
 (avatar aproximado + voz clonada/gerada), com **teto de gasto por job e por dia**.
 
-Escopo (cenário A): 1080p final, até 3 pessoas, render interno em 720p + upscale
+Escopo (cenário A): 1080p final, até 3 pessoas, render interno em 540p (padrão; 720p opcional) + upscale
 Real-ESRGAN, só os trechos com pessoa passam pela GPU, GPU alugada (Vast.ai/RunPod).
 
 ```
@@ -155,9 +155,10 @@ calibrar, use tetos conservadores.
 
 - **Retarget 2D**: os ossos giram só no plano da imagem (câmera ortográfica). Braço
   apontando para a câmera vira braço curto; não há expressão facial.
-- **O avatar é desenhado por cima da pessoa original**, não a substitui. Partes da
-  pessoa que o avatar não cobre continuam visíveis. Remover a pessoa exige inpainting
-  (ex.: ProPainter) antes do render; é o próximo passo natural.
+- **Inpainting** (`workers/inpaint/clean.py`): antes do render, a pessoa que vira
+  avatar é apagada (máscara YOLO-seg + fundo pela mediana do bloco quando a câmera
+  está parada; LaMa quadro a quadro quando a câmera mexe). Pessoas que não viram
+  personagem ficam. Desligue com `INPAINT=false`.
 - **Folha de referência**: usa o painel mais à esquerda como vista frontal
   (`SHEET_PANELS` força o número de painéis). O rig supõe A-pose; se a malha sair
   deitada ou de costas, ajuste `AVATAR_EULER`.

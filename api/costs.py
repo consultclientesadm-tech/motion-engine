@@ -3,8 +3,9 @@
   * nos workers, para reservar o custo de cada etapa/bloco antes de rodar;
   * em scripts/cost_estimate.py.
 
-Os segundos de GPU por frame são chutes de referência para uma A100 e
-PRECISAM ser calibrados no seu hardware (veja README, seção Calibração).
+Os segundos de GPU por frame foram medidos numa RTX A5000 (RunPod, 20/11/2026,
+render 720p) e ajustados para o render padrão de 960x540. Recalibre no seu
+hardware (veja README, seção Calibração).
 Todos podem ser sobrescritos por variável de ambiente COST_<NOME>.
 """
 from __future__ import annotations
@@ -23,12 +24,13 @@ def _f(name: str, default: float) -> float:
 # GPU-segundos por frame
 DETECT_S = _f("detect_s", 0.012)            # YOLOv8m + ByteTrack, todo frame
 POSE_S_PER_PERSON = _f("pose_s", 0.008)     # DWPose por pessoa, frames com gente
-RENDER_S_BASE = _f("render_s_base", 0.15)   # Blender EEVEE 720p, cena
+RENDER_S_BASE = _f("render_s_base", 0.15)   # Blender EEVEE 540p, cena (720p medido: ~0,21)
 RENDER_S_PER_PERSON = _f("render_s_person", 0.10)
 LIPSYNC_S_PER_FACE = _f("lipsync_s", 0.03)  # Wav2Lip por rosto que fala
-UPSCALE_S = _f("upscale_s", 0.18)           # Real-ESRGAN x2 em 1280x720
+UPSCALE_S = _f("upscale_s", 0.35)           # Real-ESRGAN x2 de 960x540 (de 1280x720 medido: 0,55)
+INPAINT_S = _f("inpaint_s", 0.03)           # YOLO-seg + composição do fundo, frames com gente
 # GPU-segundos fixos
-AVATAR_S_PER_CHAR = _f("avatar_s", 60.0)    # TripoSR + textura + auto-rig no Blender
+AVATAR_S_PER_CHAR = _f("avatar_s", 50.0)    # TripoSR + textura + auto-rig no Blender
 TTS_S_PER_AUDIO_S = _f("tts_s", 0.3)        # XTTS/F5 por segundo de fala
 TASK_OVERHEAD_S = _f("overhead_s", 20.0)    # carregar pesos por tarefa
 # CPU
@@ -79,7 +81,8 @@ def build_s(characters: int, speech_s: float = 0.0) -> float:
 
 
 def render_block_s(seconds: float, fps: float, people: int) -> float:
-    return seconds * fps * (RENDER_S_BASE + RENDER_S_PER_PERSON * max(people, 1)) + TASK_OVERHEAD_S
+    inpaint = INPAINT_S if get_settings().inpaint else 0.0
+    return seconds * fps * (RENDER_S_BASE + RENDER_S_PER_PERSON * max(people, 1) + inpaint) + TASK_OVERHEAD_S
 
 
 def lipsync_block_s(seconds: float, fps: float, faces: int) -> float:

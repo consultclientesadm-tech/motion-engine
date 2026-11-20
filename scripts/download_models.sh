@@ -11,3 +11,5 @@ get https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.1/RealESRGAN_x
 if [ ! -s "$DIR/wav2lip_gan.pth" ]; then
   echo "AVISO: baixe wav2lip_gan.pth manualmente (link no README do Wav2Lip) para $DIR/" >&2
 fi
+# LaMa (TorchScript) para preencher o fundo onde a pessoa original estava
+get https://github.com/enesmsahin/simple-lama-inpainting/releases/download/v0.1.0/big-lama.pt big-lama.pt
