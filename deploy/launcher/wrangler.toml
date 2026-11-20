@@ -11,10 +11,11 @@ compatibility_date = "2026-10-01"
 [vars]
 POD_NAME = "motion-engine"
 # ID do Network Volume "motion-engine" (RunPod > Storage)
-NETWORK_VOLUME_ID = "PREENCHER"
+NETWORK_VOLUME_ID = "kl3al7r6s6"   # 30 GB, datacenter CA-MTL-1
 # mesma imagem e comando de início do pod atual (deploy/runpod/start.sh no volume)
-IMAGE = "PREENCHER"            # a mesma imagem do pod atual
-START_CMD = "bash /workspace/motion/start.sh"   # conferir com o comando do pod atual
+IMAGE = "runpod/pytorch:2.4.0-py3.11-cuda12.4.1-devel-ubuntu22.04"
+# sobe o motor em segundo plano e entrega o processo ao /start.sh da imagem (ssh + mantém o container vivo)
+START_CMD = "mkdir -p /workspace/motion/logs; (bash /workspace/motion/start.sh > /workspace/motion/logs/boot.log 2>&1 &); exec /start.sh"
 # ordem de preferência; a primeira livre no datacenter do volume é usada
 GPU_TYPES = "NVIDIA A40,NVIDIA RTX A6000,NVIDIA GeForce RTX 4090,NVIDIA L40S,NVIDIA RTX A5000"
 CONTAINER_DISK_GB = "30"
