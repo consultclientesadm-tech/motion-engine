@@ -3,6 +3,7 @@
 torch>=2.3
 torchvision>=0.18
 ultralytics>=8.2          # YOLOv8 + ByteTrack
+lap>=0.5.12               # o ByteTrack do ultralytics precisa; sem ele o ultralytics tenta pip install em tempo de execução
 rtmlib>=0.0.13            # DWPose via ONNX Runtime
 onnxruntime-gpu>=1.18,<1.23    # 1.23+ exige CUDA 13; a imagem é CUDA 12.4
 opencv-python-headless>=4.9
