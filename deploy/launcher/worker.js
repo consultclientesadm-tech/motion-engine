@@ -4,24 +4,27 @@
 // apaga esse pod (o disco fixo NÃO é apagado) e cria outro no mesmo disco com
 // a primeira GPU livre da lista GPU_TYPES.
 
-const API = "https://rest.runpod.io/v1";
+// API GraphQL do RunPod (o host REST rest.runpod.io não resolve a partir do Cloudflare: erro 1016)
+const GQL = "https://api.runpod.io/graphql";
 
-async function rp(env, path, init = {}) {
-  const r = await fetch(API + path, {
-    ...init,
+async function gql(env, query, variables = {}) {
+  const r = await fetch(GQL, {
+    method: "POST",
     headers: { Authorization: `Bearer ${env.RUNPOD_API_KEY}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ query, variables }),
   });
   const text = await r.text();
-  let body; try { body = JSON.parse(text); } catch { body = text; }
-  if (!r.ok) throw new Error(`RunPod ${r.status}: ${typeof body === "string" ? body : JSON.stringify(body)}`);
+  let body; try { body = JSON.parse(text); } catch { throw new Error(`RunPod ${r.status}: ${text.slice(0, 200)}`); }
   return body;
 }
+const gqlErr = (b) => (b.errors && b.errors[0] && b.errors[0].message) || null;
 
 const uiUrl = (id) => `https://${id}-8000.proxy.runpod.net/ui`;
 
 async function ourPods(env) {
-  const pods = await rp(env, "/pods");
-  return (Array.isArray(pods) ? pods : pods.pods || []).filter((p) => p.name === env.POD_NAME);
+  const b = await gql(env, "{ myself { pods { id name desiredStatus costPerHr machine { gpuDisplayName } } } }");
+  if (gqlErr(b)) throw new Error("RunPod: " + gqlErr(b));
+  return b.data.myself.pods.filter((p) => p.name === env.POD_NAME);
 }
 
 async function ready(id) {
@@ -37,25 +40,23 @@ async function status(env) {
   if (!running) return { state: "off" };
   const ok = await ready(running.id);
   return { state: ok ? "ready" : "starting", id: running.id, url: uiUrl(running.id),
-           gpu: running.machine?.gpuTypeId || running.gpu?.displayName || null,
-           cost: running.costPerHr ?? null };
+           gpu: running.machine?.gpuDisplayName || null, cost: running.costPerHr ?? null };
 }
 
 async function create(env) {
-  const body = {
-    name: env.POD_NAME,
-    imageName: env.IMAGE,
-    gpuTypeIds: env.GPU_TYPES.split(",").map((s) => s.trim()).filter(Boolean),
-    gpuTypePriority: "custom",
-    gpuCount: 1,
-    cloudType: "SECURE",
-    networkVolumeId: env.NETWORK_VOLUME_ID,
-    volumeMountPath: "/workspace",
-    containerDiskInGb: Number(env.CONTAINER_DISK_GB || 30),
-    ports: ["8000/http", "22/tcp"],
-    dockerStartCmd: ["bash", "-c", env.START_CMD],
-  };
-  return rp(env, "/pods", { method: "POST", body: JSON.stringify(body) });
+  const q = "mutation($i: PodFindAndDeployOnDemandInput) { podFindAndDeployOnDemand(input:$i) { id costPerHr } }";
+  const tried = [];
+  for (const gpu of env.GPU_TYPES.split(",").map((s) => s.trim()).filter(Boolean)) {
+    const i = { cloudType: "SECURE", gpuCount: 1, gpuTypeId: gpu, name: env.POD_NAME,
+      imageName: env.IMAGE, dockerArgs: `bash -c '${env.START_CMD}'`, ports: "8000/http,22/tcp",
+      volumeMountPath: "/workspace", containerDiskInGb: Number(env.CONTAINER_DISK_GB || 20),
+      networkVolumeId: env.NETWORK_VOLUME_ID, dataCenterId: env.DATA_CENTER };
+    const b = await gql(env, q, { i });
+    const pod = b.data && b.data.podFindAndDeployOnDemand;
+    if (pod) return pod;
+    tried.push(gpu.replace("NVIDIA ", ""));
+  }
+  throw new Error("Nenhuma GPU livre agora (" + tried.join(", ") + "). Tente de novo em alguns minutos.");
 }
 
 async function start(env) {
@@ -63,13 +64,10 @@ async function start(env) {
   const running = pods.find((p) => p.desiredStatus === "RUNNING");
   if (running) return { id: running.id, note: "já estava ligado" };
   for (const p of pods) {
-    try {
-      await rp(env, `/pods/${p.id}/start`, { method: "POST" });
-      return { id: p.id, note: "religado" };
-    } catch (e) {
-      // GPU dele indisponível: apaga só o pod (o Network Volume fica intacto)
-      await rp(env, `/pods/${p.id}`, { method: "DELETE" }).catch(() => {});
-    }
+    const b = await gql(env, "mutation($id: String!) { podResume(input:{podId:$id, gpuCount:1}) { id desiredStatus } }", { id: p.id });
+    if (b.data && b.data.podResume) return { id: p.id, note: "religado" };
+    // GPU dele indisponível: apaga só o pod (o Network Volume fica intacto)
+    await gql(env, "mutation($id: String!) { podTerminate(input:{podId:$id}) }", { id: p.id });
   }
   const pod = await create(env);
   return { id: pod.id, note: "pod novo numa GPU livre" };
@@ -78,7 +76,7 @@ async function start(env) {
 async function stop(env) {
   const pods = await ourPods(env);
   for (const p of pods.filter((p) => p.desiredStatus === "RUNNING")) {
-    await rp(env, `/pods/${p.id}/stop`, { method: "POST" });
+    await gql(env, "mutation($id: String!) { podStop(input:{podId:$id}) { id } }", { id: p.id });
   }
   return { stopped: true };
 }
