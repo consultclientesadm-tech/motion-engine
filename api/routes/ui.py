@@ -99,3 +99,21 @@ def video(job_id: str, download: bool = False, range: str | None = Header(None),
     body = obj["Body"]
     return StreamingResponse(body.iter_chunks(CHUNK), status_code=status, media_type="video/mp4",
                              headers=headers)
+
+
+@router.post("/ui/shutdown", include_in_schema=False)
+def shutdown(force: bool = False, session: Session = Depends(get_session)):
+    """Botão "Desligar agora": para o pod do RunPod (para de cobrar a GPU).
+    Recusa se houver vídeo em produção, a não ser com force=true."""
+    import os
+    import threading
+
+    from db.models import ACTIVE_STATES
+    from scripts import idle_shutdown
+    if not os.environ.get("RUNPOD_POD_ID"):
+        raise HTTPException(400, "não estou rodando num pod do RunPod")
+    n = session.query(Job).filter(Job.state.in_(list(ACTIVE_STATES))).count()
+    if n and not force:
+        raise HTTPException(409, f"há {n} vídeo(s) em produção; desligar agora interrompe")
+    threading.Timer(2.0, idle_shutdown.stop_pod).start()   # responde antes de o pod cair
+    return {"ok": True, "message": "desligando o servidor em instantes"}

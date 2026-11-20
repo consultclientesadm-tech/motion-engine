@@ -150,6 +150,13 @@
   </section>
 
   <section class="card">
+    <h2>Servidor</h2>
+    <p class="hint">A GPU cobra por hora enquanto o servidor está ligado. Ele desliga sozinho após 15 min sem uso; para ligar de novo, use o app ou site do RunPod (pod "motion-engine" → Start).</p>
+    <button type="button" id="shutdown">Desligar servidor agora</button>
+    <div id="shutdownMsg" class="hint" style="margin-top:8px"></div>
+  </section>
+
+  <section class="card">
     <h2 style="display:flex;justify-content:space-between">3. Vídeos recentes <button id="refresh" style="padding:2px 10px">Atualizar</button></h2>
     <ul class="jobs" id="jobs"><li class="hint">Carregando…</li></ul>
   </section>
@@ -161,7 +168,7 @@ const STATES = {
   queued: ["Na fila", "Esperando um worker de GPU pegar o job."],
   analyzing: ["Analisando", "Detectando e rastreando as pessoas e as poses (YOLO + ByteTrack + DWPose)."],
   building: ["Criando avatares", "Gerando o avatar 3D de cada pessoa a partir da foto (TripoSR) e a voz."],
-  rendering: ["Renderizando", "Renderizando os blocos de 30 s em 720p."],
+  rendering: ["Renderizando", "Apagando a pessoa original e renderizando os avatares em blocos de 30 s."],
   audio: ["Áudio", "Sincronizando boca e áudio."],
   post: ["Finalizando", "Upscale para 1080p (Real-ESRGAN) e montagem final com FFmpeg."],
   done: ["Pronto", "Vídeo pronto. Assista abaixo ou baixe o MP4."],
@@ -391,6 +398,17 @@ async function loadJobs() {
   }
 }
 $("refresh").onclick = loadJobs;
+$("shutdown").onclick = async () => {
+  if (!confirm("Desligar o servidor agora? A página para de funcionar até ligar de novo pelo RunPod.")) return;
+  let r = await fetch("/ui/shutdown", {method: "POST"});
+  if (r.status === 409) {
+    const b = await r.json();
+    if (!confirm(b.detail + ". Desligar mesmo assim?")) return;
+    r = await fetch("/ui/shutdown?force=true", {method: "POST"});
+  }
+  const b = await r.json().catch(() => ({}));
+  $("shutdownMsg").textContent = r.ok ? "Desligando… pode fechar esta página." : ("Não deu: " + (b.detail || r.status));
+};
 loadJobs();
 
 const m = location.hash.match(/job=([\w-]+)/);

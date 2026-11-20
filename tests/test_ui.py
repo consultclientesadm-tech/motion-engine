@@ -100,3 +100,21 @@ def test_video_stream_only_when_done_and_supports_range(client, fake_s3, db):
     r = client.get(f"/ui/jobs/{job['id']}/video?download=1")
     assert "attachment" in r.headers["content-disposition"]
     assert client.get("/ui/jobs/nao-existe/video").status_code == 404
+
+
+def test_shutdown_button(client, monkeypatch):
+    import threading
+
+    from scripts import idle_shutdown
+    calls = []
+    monkeypatch.setattr(idle_shutdown, "stop_pod", lambda: calls.append(1))
+    monkeypatch.setattr(threading, "Timer", lambda t, f: type("T", (), {"start": lambda self: f()})())
+    monkeypatch.delenv("RUNPOD_POD_ID", raising=False)
+    assert client.post("/ui/shutdown").status_code == 400          # fora do RunPod
+    monkeypatch.setenv("RUNPOD_POD_ID", "abc")
+    client.post("/jobs", json={"video_url": "s3://b/clip.mp4", "duration_s": 30,
+                               "characters": [{"name": "Ana", "sheet_url": "s3://b/ana.png"}]})
+    assert client.post("/ui/shutdown").status_code == 409          # job em produção
+    assert calls == []
+    r = client.post("/ui/shutdown?force=true")
+    assert r.status_code == 200 and calls == [1]

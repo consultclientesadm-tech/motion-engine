@@ -11,6 +11,7 @@ Layout das chaves:
 from __future__ import annotations
 
 import json
+import logging
 import os
 import shutil
 import urllib.request
@@ -22,6 +23,8 @@ from botocore.config import Config
 from botocore.exceptions import ClientError
 
 from settings import get_settings
+
+log = logging.getLogger(__name__)
 
 
 @lru_cache
@@ -129,6 +132,17 @@ def ensure_bucket_and_lifecycle() -> None:
         c.head_bucket(Bucket=s.s3_bucket)
     except ClientError:
         c.create_bucket(Bucket=s.s3_bucket)
+    try:
+        _put_lifecycle(c, s)
+    except ClientError as e:
+        # S3 local (rclone serve s3, moto) pode não implementar lifecycle: segue sem ele
+        code = e.response.get("Error", {}).get("Code")
+        if code not in ("NotImplemented", "MethodNotAllowed", "InvalidRequest", "501"):
+            raise
+        log.warning("S3 sem suporte a lifecycle (%s): tmp/ não expira sozinho", code)
+
+
+def _put_lifecycle(c, s) -> None:
     c.put_bucket_lifecycle_configuration(
         Bucket=s.s3_bucket,
         LifecycleConfiguration={"Rules": [
