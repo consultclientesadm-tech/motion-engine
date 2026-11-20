@@ -60,6 +60,19 @@ Na GPU alugada, rode só o worker (`docker/Dockerfile.worker`) com `DATABASE_URL
 `REDIS_URL` e `S3_*` apontando para o servidor onde estão API, Postgres e Redis.
 Um worker processa um job por vez (`--concurrency 1`).
 
+### Interface de teste
+
+Com a API no ar, abra **http://localhost:8000/ui** (a raiz `/` redireciona para lá).
+Envie o vídeo de referência e a foto de cada pessoa (voz é opcional), clique em
+**Gerar vídeo** e acompanhe estado, blocos prontos, avatares e gasto (atualiza a cada 3 s).
+Quando termina, o vídeo toca na própria página e o botão **Baixar MP4** salva o arquivo.
+Dá para cancelar, retomar (com teto maior, se parou por orçamento) e reabrir jobs recentes.
+
+Sem login e sem pagamento: é só para testar o motor. O vídeo passa pela API
+(`/ui/jobs/{id}/video`) porque a URL do S3 aponta para o endpoint interno (`minio:9000`),
+que o navegador não alcança. O upload (`POST /ui/upload`) aceita vídeo, imagem e áudio e,
+para vídeo, já mede a duração com ffprobe.
+
 ### Fluxo pela API
 
 ```bash
