@@ -2,8 +2,8 @@
 
 Normaliza a malha do TripoSR, cria o esqueleto (A-pose, ossos girando no
 plano XZ) e faz o skin. Salva avatar.blend (usado pelo render) e avatar.glb
-(prévia). Variável AVATAR_EULER="x,y,z" (graus) corrige a orientação da malha
-se o seu TripoSR exportar deitado ou de costas.
+(prévia). Variável AVATAR_EULER="x,y,z" (graus, padrão 0,0,90 para o TripoSR)
+corrige a orientação da malha se outro backend exportar deitado ou de costas.
 """
 import json
 import math
@@ -19,23 +19,18 @@ H = cfg["height"]
 bpy.ops.wm.read_factory_settings(use_empty=True)
 
 # ---- malha -----------------------------------------------------------------
-bpy.ops.wm.obj_import(filepath=cfg["mesh"])
+# O TripoSR exporta Z para cima e a frente da pessoa olhando para -X. O import
+# padrão do Blender trata o OBJ como Y para cima (deitava o avatar com o topo da
+# cabeça virado para a câmera), então lemos as coordenadas cruas (Z para cima) e
+# giramos 90° em Z: a frente vai para -Y, de frente para a câmera do render.
+bpy.ops.wm.obj_import(filepath=cfg["mesh"], forward_axis="Y", up_axis="Z")
 mesh = [o for o in bpy.context.scene.objects if o.type == "MESH"][0]
 mesh.name = "avatar_mesh"
 bpy.context.view_layer.objects.active = mesh
 mesh.select_set(True)
 
-euler = os.environ.get("AVATAR_EULER")
-if euler:
-    mesh.rotation_euler = Euler([math.radians(float(v)) for v in euler.split(",")])
-else:
-    # eixo mais longo vira Z (em pé)
-    dims = mesh.dimensions
-    longest = max(range(3), key=lambda i: dims[i])
-    if longest == 0:
-        mesh.rotation_euler = Euler((0, math.radians(90), 0))
-    elif longest == 1:
-        mesh.rotation_euler = Euler((math.radians(90), 0, 0))
+euler = os.environ.get("AVATAR_EULER", "0,0,90")
+mesh.rotation_euler = Euler([math.radians(float(v)) for v in euler.split(",")])
 bpy.ops.object.transform_apply(location=False, rotation=True, scale=False)
 
 # escala para H e pés em z=0, centrado em x/y
