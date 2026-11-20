@@ -1,0 +1,25 @@
+-r requirements-api.txt
+# visão / tracking / pose
+torch>=2.3
+torchvision>=0.18
+ultralytics>=8.2          # YOLOv8 + ByteTrack
+rtmlib>=0.0.13            # DWPose via ONNX Runtime
+onnxruntime-gpu>=1.18
+opencv-python-headless>=4.9
+# avatar (TripoSR é clonado no Dockerfile; estas são as deps dele)
+trimesh>=4.0
+omegaconf>=2.3
+einops>=0.7
+transformers>=4.40
+huggingface-hub>=0.23
+rembg[gpu]>=2.0.56
+Pillow>=10.3
+git+https://github.com/tatsy/torchmcubes.git
+# voz
+coqui-tts>=0.24           # XTTS v2 (fork mantido do Coqui TTS)
+f5-tts>=0.3
+soundfile>=0.12
+librosa>=0.10             # usado pelo audio.py do Wav2Lip
+# upscale
+realesrgan>=0.3.0
+basicsr>=1.4.2
