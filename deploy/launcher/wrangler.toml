@@ -7,6 +7,8 @@
 name = "motion-engine-ligar"
 main = "worker.js"
 compatibility_date = "2026-10-01"
+# subdomínio novo do domínio do Leonardo (o Cloudflare cria o registro sozinho; nenhum DNS existente é alterado)
+routes = [{ pattern = "motion.afinavoice.com", custom_domain = true }]
 
 [vars]
 POD_NAME = "motion-engine"
