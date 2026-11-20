@@ -24,7 +24,9 @@ from db.models import Base  # noqa: E402
 from db.session import configure  # noqa: E402
 
 target_metadata = Base.metadata
-config.set_main_option("sqlalchemy.url", str(configure().url).replace("%", "%%"))
+# str(url) troca a senha por "***" no SQLAlchemy 2; render_as_string mantém a senha
+config.set_main_option("sqlalchemy.url",
+                       configure().url.render_as_string(hide_password=False).replace("%", "%%"))
 
 # other values from the config, defined by the needs of env.py,
 # can be acquired:
