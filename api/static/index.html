@@ -1,0 +1,418 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Motion Engine · teste</title>
+<style>
+  :root {
+    --bg: #f6f6f4; --card: #ffffff; --ink: #1d1d1b; --muted: #6b6b66; --line: #e3e3de;
+    --accent: #2f5bea; --accent-ink: #fff; --ok: #1f8a4c; --warn: #b7791f; --bad: #c0392b;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #151514; --card: #1f1f1d; --ink: #ecece8; --muted: #9a9a93; --line: #33332f;
+            --accent: #6b8cff; --accent-ink: #0d0d0c; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+         font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 860px; margin: 0 auto; padding: 24px 16px 64px; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  h2 { font-size: 16px; margin: 0 0 12px; }
+  p.sub { color: var(--muted); margin: 0 0 20px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+          padding: 18px; margin-bottom: 18px; }
+  label { display: block; font-weight: 600; margin: 0 0 6px; }
+  .hint { color: var(--muted); font-size: 13px; font-weight: 400; }
+  input[type=text], input[type=number], select {
+    width: 100%; padding: 9px 10px; border: 1px solid var(--line); border-radius: 8px;
+    background: transparent; color: inherit; font: inherit; }
+  .drop { border: 2px dashed var(--line); border-radius: 10px; padding: 16px; text-align: center;
+          cursor: pointer; color: var(--muted); position: relative; }
+  .drop.has { border-style: solid; color: var(--ink); }
+  .drop input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+  .drop img { max-height: 120px; max-width: 100%; border-radius: 6px; display: block; margin: 0 auto 6px; }
+  .row { display: grid; gap: 12px; grid-template-columns: 1fr 1fr; }
+  .person { border: 1px solid var(--line); border-radius: 10px; padding: 12px; margin-bottom: 10px; }
+  .person .top { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; }
+  .person .top input { flex: 1; }
+  button { font: inherit; border: 1px solid var(--line); background: transparent; color: inherit;
+           border-radius: 8px; padding: 8px 14px; cursor: pointer; }
+  button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent);
+                   font-weight: 600; padding: 11px 20px; }
+  button:disabled { opacity: .5; cursor: default; }
+  .bar { height: 10px; background: var(--line); border-radius: 99px; overflow: hidden; }
+  .bar > div { height: 100%; width: 0; background: var(--accent); transition: width .4s; }
+  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 14px 0; }
+  .stat { border: 1px solid var(--line); border-radius: 8px; padding: 10px; }
+  .stat b { display: block; font-size: 18px; }
+  .stat span { color: var(--muted); font-size: 12px; }
+  .pill { display: inline-block; padding: 2px 10px; border-radius: 99px; font-size: 13px;
+          font-weight: 600; background: var(--line); }
+  .pill.done { background: var(--ok); color: #fff; }
+  .pill.failed, .pill.cancelled { background: var(--bad); color: #fff; }
+  .pill.paused_budget { background: var(--warn); color: #fff; }
+  .err { color: var(--bad); white-space: pre-wrap; font-size: 14px; }
+  video { width: 100%; border-radius: 10px; background: #000; margin-top: 10px; }
+  .jobs { list-style: none; margin: 0; padding: 0; }
+  .jobs li { display: flex; justify-content: space-between; gap: 10px; padding: 10px 4px;
+             border-top: 1px solid var(--line); cursor: pointer; }
+  .jobs li:first-child { border-top: 0; }
+  .jobs li:hover { background: var(--bg); }
+  .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; }
+  details summary { cursor: pointer; color: var(--muted); margin: 12px 0 8px; }
+  .actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+  .hidden { display: none; }
+  /* celular: alvos de toque grandes, fonte 16px (o iPhone não dá zoom no campo) */
+  input[type=text], input[type=number], select { font-size: 16px; min-height: 44px; }
+  button { min-height: 44px; }
+  .drop { padding: 22px 14px; }
+  @media (max-width: 600px) {
+    main { padding: 16px 12px 96px; }
+    .row, .stats { grid-template-columns: 1fr; }
+    .stats { grid-template-columns: repeat(3, 1fr); gap: 6px; }
+    .stat { padding: 8px 6px; } .stat b { font-size: 15px; } .stat span { font-size: 11px; }
+    .card { padding: 14px; border-radius: 10px; }
+    #new .actions { position: sticky; bottom: 0; background: var(--card); padding: 10px 0;
+                    margin: 12px -14px -14px; padding: 10px 14px; border-top: 1px solid var(--line);
+                    border-radius: 0 0 10px 10px; }
+    #new .actions button.primary, #result .actions a, #result .actions button { width: 100%; }
+    .jobs li { flex-direction: column; gap: 2px; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <h1>Motion Engine</h1>
+  <p class="sub">Envie o vídeo de referência e a foto de cada pessoa. Para testar, use vídeos de até 30 s: ficam prontos em poucos minutos.</p>
+
+  <section class="card" id="new">
+    <h2>1. Novo vídeo</h2>
+    <label>Vídeo de referência <span class="hint">(mp4, mov, mkv, webm)</span></label>
+    <div class="drop" id="videoDrop">
+      <input type="file" id="videoFile" accept="video/*,.mkv">
+      <div id="videoLabel">Toque para escolher o vídeo (ou arraste aqui)</div>
+    </div>
+
+    <div style="margin-top:18px">
+      <label>Pessoas do vídeo <span class="hint">(uma foto/folha de personagem para cada pessoa, até 8)</span></label>
+      <div id="people"></div>
+      <button type="button" id="addPerson">+ Adicionar pessoa</button>
+    </div>
+
+    <details>
+      <summary>Opções avançadas</summary>
+      <div class="row">
+        <div>
+          <label>Resolução final</label>
+          <select id="resolution"><option value="1080p">1080p</option><option value="720p">720p</option></select>
+        </div>
+        <div>
+          <label>Teto de gasto do job (US$)</label>
+          <input type="number" id="budget" value="30" min="1" step="1">
+        </div>
+      </div>
+      <label style="margin-top:10px;font-weight:400">
+        <input type="checkbox" id="onlyPeople" checked> Processar só os trechos com pessoa
+      </label>
+    </details>
+
+    <div class="actions">
+      <button class="primary" id="go">Gerar vídeo</button>
+    </div>
+    <div id="uploadInfo" class="hint" style="margin-top:10px"></div>
+    <div class="bar hidden" id="uploadBar" style="margin-top:6px"><div></div></div>
+    <div id="formErr" class="err" style="margin-top:10px"></div>
+  </section>
+
+  <section class="card hidden" id="status">
+    <h2>2. Andamento <span class="mono hint" id="jobId"></span></h2>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <span class="pill" id="state">—</span>
+      <span class="hint" id="pct">0%</span>
+    </div>
+    <div class="bar" id="progress"><div></div></div>
+    <div class="stats">
+      <div class="stat"><b id="blocks">0 / 0</b><span>blocos de 30 s prontos</span></div>
+      <div class="stat"><b id="cost">US$ 0,00</b><span id="costSub">gasto até agora</span></div>
+      <div class="stat"><b id="avatars">—</b><span>avatares prontos</span></div>
+    </div>
+    <div id="stateText" class="hint"></div>
+    <div id="jobErr" class="err"></div>
+    <div id="result" class="hidden">
+      <video id="player" controls playsinline preload="metadata"></video>
+      <div class="actions"><a id="download"><button class="primary" type="button">Baixar MP4</button></a></div>
+    </div>
+    <div class="actions">
+      <button id="cancel" class="hidden">Cancelar</button>
+      <button id="resume" class="hidden">Retomar de onde parou</button>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Servidor</h2>
+    <p class="hint">A GPU cobra por hora enquanto o servidor está ligado. Ele desliga sozinho após 15 min sem uso; para ligar de novo, use o app ou site do RunPod (pod "motion-engine" → Start).</p>
+    <button type="button" id="shutdown">Desligar servidor agora</button>
+    <div id="shutdownMsg" class="hint" style="margin-top:8px"></div>
+  </section>
+
+  <section class="card">
+    <h2 style="display:flex;justify-content:space-between">3. Vídeos recentes <button id="refresh" style="padding:2px 10px">Atualizar</button></h2>
+    <ul class="jobs" id="jobs"><li class="hint">Carregando…</li></ul>
+  </section>
+</main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const STATES = {
+  queued: ["Na fila", "Esperando um worker de GPU pegar o job."],
+  analyzing: ["Analisando", "Detectando e rastreando as pessoas e as poses (YOLO + ByteTrack + DWPose)."],
+  building: ["Criando avatares", "Gerando o avatar 3D de cada pessoa a partir da foto (TripoSR) e a voz."],
+  rendering: ["Renderizando", "Apagando a pessoa original e renderizando os avatares em blocos de 30 s."],
+  audio: ["Áudio", "Sincronizando boca e áudio."],
+  post: ["Finalizando", "Upscale para 1080p (Real-ESRGAN) e montagem final com FFmpeg."],
+  done: ["Pronto", "Vídeo pronto. Assista abaixo ou baixe o MP4."],
+  paused_budget: ["Pausado (teto)", "Parou porque o próximo passo passaria do teto de gasto. Dá para retomar com um teto maior."],
+  failed: ["Falhou", "Deu erro. Veja a mensagem abaixo; dá para retomar do último bloco salvo."],
+  cancelled: ["Cancelado", "Job cancelado. Dá para retomar do último bloco salvo."],
+};
+const ACTIVE = new Set(["queued", "analyzing", "building", "rendering", "audio", "post"]);
+const money = (v) => "US$ " + (v ?? 0).toFixed(2).replace(".", ",");
+let videoFile = null, currentJob = null, timer = null;
+
+// ---------- formulário ----------
+function addPerson() {
+  const n = $("people").children.length;
+  if (n >= 8) return;
+  const el = document.createElement("div");
+  el.className = "person";
+  el.innerHTML = `
+    <div class="top">
+      <input type="text" class="name" placeholder="Nome" value="Pessoa ${n + 1}">
+      <button type="button" class="rm" title="Remover">✕</button>
+    </div>
+    <div class="row">
+      <div><label>Foto / folha <span class="hint">(png, jpg, webp)</span></label>
+        <div class="drop"><input type="file" class="photo" accept=".png,.jpg,.jpeg,.webp"><div class="lbl">Escolher imagem</div></div></div>
+      <div><label>Amostra de voz <span class="hint">(opcional)</span></label>
+        <div class="drop"><input type="file" class="voice" accept=".wav,.mp3,.flac,.m4a"><div class="lbl">Escolher áudio</div></div></div>
+    </div>`;
+  el.querySelector(".rm").onclick = () => { if ($("people").children.length > 1) el.remove(); };
+  el.querySelector(".photo").onchange = (e) => {
+    const f = e.target.files[0], box = e.target.parentElement;
+    if (!f) return;
+    box.classList.add("has");
+    box.querySelector(".lbl").innerHTML = `<img src="${URL.createObjectURL(f)}">${escapeHtml(f.name)}`;
+  };
+  el.querySelector(".voice").onchange = (e) => {
+    const f = e.target.files[0], box = e.target.parentElement;
+    if (!f) return;
+    box.classList.add("has");
+    box.querySelector(".lbl").textContent = f.name;
+  };
+  $("people").appendChild(el);
+}
+$("addPerson").onclick = addPerson;
+addPerson();
+
+$("videoFile").onchange = (e) => {
+  videoFile = e.target.files[0] || null;
+  $("videoDrop").classList.toggle("has", !!videoFile);
+  $("videoLabel").textContent = videoFile
+    ? `${videoFile.name} (${(videoFile.size / 1e6).toFixed(1)} MB)` : "Toque para escolher o vídeo (ou arraste aqui)";
+};
+
+function escapeHtml(s) { return s.replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+
+function uploadFile(file, label) {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    const fd = new FormData();
+    fd.append("file", file);
+    xhr.open("POST", "/ui/upload");
+    $("uploadBar").classList.remove("hidden");
+    xhr.upload.onprogress = (e) => {
+      if (!e.lengthComputable) return;
+      const p = Math.round((e.loaded / e.total) * 100);
+      $("uploadInfo").textContent = `Enviando ${label}… ${p}%`;
+      $("uploadBar").firstElementChild.style.width = p + "%";
+    };
+    xhr.onload = () => {
+      let body = null;
+      try { body = JSON.parse(xhr.responseText); } catch (_) {}
+      if (xhr.status >= 200 && xhr.status < 300) resolve(body);
+      else reject(new Error(`${label}: ${errText(body) || xhr.statusText || xhr.status}`));
+    };
+    xhr.onerror = () => reject(new Error(`${label}: falha de rede no envio`));
+    xhr.send(fd);
+  });
+}
+
+function errText(body) {
+  if (!body) return "";
+  const d = body.detail ?? body;
+  if (typeof d === "string") return d;
+  if (Array.isArray(d)) return d.map((x) => `${(x.loc || []).slice(1).join(".")}: ${x.msg}`).join("\n");
+  if (d.message) return d.message + (d.estimated_usd != null ? ` (estimativa ${money(d.estimated_usd)}, disponível ${money(d.available_usd)})` : "");
+  return JSON.stringify(d);
+}
+
+$("go").onclick = async () => {
+  $("formErr").textContent = "";
+  const people = [...$("people").children].map((el) => ({
+    name: el.querySelector(".name").value.trim(),
+    photo: el.querySelector(".photo").files[0],
+    voice: el.querySelector(".voice").files[0],
+  }));
+  if (!videoFile) return ($("formErr").textContent = "Escolha o vídeo de referência.");
+  if (people.some((p) => !p.name)) return ($("formErr").textContent = "Dê um nome para cada pessoa.");
+  if (new Set(people.map((p) => p.name)).size !== people.length) return ($("formErr").textContent = "Os nomes precisam ser diferentes.");
+  if (people.some((p) => !p.photo)) return ($("formErr").textContent = "Escolha a foto de cada pessoa.");
+
+  $("go").disabled = true;
+  try {
+    const v = await uploadFile(videoFile, "vídeo");
+    const characters = [];
+    for (const p of people) {
+      const sheet = await uploadFile(p.photo, `foto de ${p.name}`);
+      const c = { name: p.name, sheet_url: sheet.url, voice_mode: "clone" };
+      if (p.voice) c.voice_ref_url = (await uploadFile(p.voice, `voz de ${p.name}`)).url;
+      characters.push(c);
+    }
+    $("uploadInfo").textContent = "Criando o job…";
+    const budget = Number($("budget").value) || 30;
+    const r = await fetch("/jobs", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        video_url: v.url, duration_s: v.duration_s, characters,
+        budget_usd: budget, daily_budget_usd: Math.max(budget, 90),
+        target_resolution: $("resolution").value,
+        process_only_with_people: $("onlyPeople").checked,
+      }),
+    });
+    const body = await r.json().catch(() => null);
+    if (!r.ok) throw new Error(errText(body) || `erro ${r.status}`);
+    $("uploadInfo").textContent = "";
+    $("uploadBar").classList.add("hidden");
+    openJob(body.id);
+    loadJobs();
+  } catch (e) {
+    $("formErr").textContent = e.message;
+    $("uploadInfo").textContent = "";
+    $("uploadBar").classList.add("hidden");
+  } finally {
+    $("go").disabled = false;
+  }
+};
+
+// ---------- andamento ----------
+function openJob(id) {
+  currentJob = id;
+  location.hash = "job=" + id;
+  $("status").classList.remove("hidden");
+  $("result").classList.add("hidden");
+  $("player").removeAttribute("src");
+  $("status").scrollIntoView({ behavior: "smooth" });
+  poll();
+}
+
+async function poll() {
+  clearTimeout(timer);
+  if (!currentJob) return;
+  const id = currentJob;
+  try {
+    const [jr, cr] = await Promise.all([fetch(`/jobs/${id}`), fetch(`/characters?job_id=${id}`)]);
+    if (!jr.ok) throw new Error(errText(await jr.json().catch(() => null)) || `erro ${jr.status}`);
+    const j = await jr.json();
+    const chars = cr.ok ? await cr.json() : [];
+    if (id !== currentJob) return;
+    render(j, chars);
+    if (ACTIVE.has(j.state)) timer = setTimeout(poll, 3000);
+  } catch (e) {
+    $("jobErr").textContent = e.message;
+    timer = setTimeout(poll, 6000);
+  }
+}
+
+function render(j, chars) {
+  const [label, text] = STATES[j.state] || [j.state, ""];
+  $("jobId").textContent = j.id.slice(0, 8);
+  $("state").textContent = label;
+  $("state").className = "pill " + j.state;
+  $("stateText").textContent = text;
+  const pct = Math.round((j.progress || 0) * 100);
+  $("pct").textContent = pct + "%";
+  $("progress").firstElementChild.style.width = pct + "%";
+  $("blocks").textContent = `${j.blocks_done} / ${j.blocks_total || "?"}`;
+  $("cost").textContent = money(j.cost_usd);
+  $("costSub").textContent = `gasto até agora · estimativa ${money(j.estimated_usd)} · teto ${money(j.budget_usd)}`;
+  $("avatars").textContent = chars.length ? `${chars.filter((c) => c.avatar_ready).length} / ${chars.length}` : "—";
+  $("jobErr").textContent = j.error || "";
+  $("cancel").classList.toggle("hidden", !ACTIVE.has(j.state));
+  $("resume").classList.toggle("hidden", !["paused_budget", "failed", "cancelled"].includes(j.state));
+  if (j.state === "done") {
+    $("result").classList.remove("hidden");
+    const src = `/ui/jobs/${j.id}/video`;
+    if (!$("player").getAttribute("src")) $("player").src = src;
+    $("download").href = src + "?download=1";
+  }
+}
+
+$("cancel").onclick = async () => {
+  if (!currentJob) return;
+  await fetch(`/jobs/${currentJob}/cancel`, { method: "POST" });
+  poll(); loadJobs();
+};
+$("resume").onclick = async () => {
+  if (!currentJob) return;
+  const state = $("state").className.replace("pill ", "");
+  let payload = {};
+  if (state === "paused_budget") {
+    const v = prompt("Novo teto de gasto do job (US$):", "60");
+    if (v === null) return;
+    payload = { budget_usd: Number(v) };
+  }
+  const r = await fetch(`/jobs/${currentJob}/resume`, {
+    method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(payload),
+  });
+  if (!r.ok) $("jobErr").textContent = errText(await r.json().catch(() => null));
+  poll(); loadJobs();
+};
+
+// ---------- lista ----------
+async function loadJobs() {
+  try {
+    const r = await fetch("/jobs?limit=20");
+    const jobs = await r.json();
+    $("jobs").innerHTML = jobs.length ? "" : '<li class="hint">Nenhum vídeo ainda.</li>';
+    for (const j of jobs) {
+      const li = document.createElement("li");
+      const [label] = STATES[j.state] || [j.state];
+      li.innerHTML = `<span><span class="mono">${j.id.slice(0, 8)}</span> · ${Math.round((j.progress || 0) * 100)}% · ${money(j.cost_usd)}</span>
+                      <span class="pill ${j.state}">${label}</span>`;
+      li.onclick = () => openJob(j.id);
+      $("jobs").appendChild(li);
+    }
+  } catch (e) {
+    $("jobs").innerHTML = `<li class="err">Não consegui carregar: ${escapeHtml(e.message)}</li>`;
+  }
+}
+$("refresh").onclick = loadJobs;
+$("shutdown").onclick = async () => {
+  if (!confirm("Desligar o servidor agora? A página para de funcionar até ligar de novo pelo RunPod.")) return;
+  let r = await fetch("/ui/shutdown", {method: "POST"});
+  if (r.status === 409) {
+    const b = await r.json();
+    if (!confirm(b.detail + ". Desligar mesmo assim?")) return;
+    r = await fetch("/ui/shutdown?force=true", {method: "POST"});
+  }
+  const b = await r.json().catch(() => ({}));
+  $("shutdownMsg").textContent = r.ok ? "Desligando… pode fechar esta página." : ("Não deu: " + (b.detail || r.status));
+};
+loadJobs();
+
+const m = location.hash.match(/job=([\w-]+)/);
+if (m) openJob(m[1]);
+</script>
+</body>
+</html>

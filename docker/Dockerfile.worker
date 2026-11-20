@@ -1,0 +1,38 @@
+# Worker de GPU (Vast.ai / RunPod). CUDA 12.4 + Blender 4.2 LTS + modelos.
+# devel (e não runtime): o torchmcubes do TripoSR compila com nvcc
+FROM nvidia/cuda:12.4.1-cudnn-devel-ubuntu22.04
+ENV DEBIAN_FRONTEND=noninteractive PYTHONUNBUFFERED=1 PIP_NO_CACHE_DIR=1
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      python3.11 python3.11-dev python3-pip git wget xz-utils ffmpeg build-essential \
+      libgl1 libglib2.0-0 libxi6 libxrender1 libxkbcommon0 libsm6 libegl1 \
+    && ln -sf /usr/bin/python3.11 /usr/bin/python && rm -rf /var/lib/apt/lists/*
+
+# Blender headless (EEVEE via EGL; troque para CYCLES se o host não tiver EGL)
+ARG BLENDER=4.2.3
+RUN wget -q https://download.blender.org/release/Blender4.2/blender-${BLENDER}-linux-x64.tar.xz \
+    && tar -xf blender-${BLENDER}-linux-x64.tar.xz -C /opt && rm blender-*.tar.xz \
+    && ln -s /opt/blender-${BLENDER}-linux-x64/blender /usr/local/bin/blender
+
+WORKDIR /app
+COPY requirements-api.txt requirements-worker.txt ./
+RUN python -m pip install -U pip && python -m pip install -r requirements-worker.txt
+# torchmcubes compila contra o torch instalado acima (com isolamento o build não acha o torch)
+RUN CUDACXX=/usr/local/cuda/bin/nvcc python -m pip install --no-build-isolation \
+      git+https://github.com/tatsy/torchmcubes.git
+# o rtmlib puxa o onnxruntime de CPU, que sobrescreve o módulo do onnxruntime-gpu
+# (o DWPose cairia na CPU sem aviso). Fica só o de GPU.
+RUN python -m pip uninstall -y onnxruntime onnxruntime-gpu \
+ && python -m pip install --no-deps "onnxruntime-gpu>=1.18,<1.23"
+# basicsr importa um módulo removido do torchvision novo. find_spec acha a pasta sem
+# importar o pacote (importar basicsr é justamente o que quebra antes do sed).
+RUN sed -i 's/from torchvision.transforms.functional_tensor import/from torchvision.transforms.functional import/' \
+      $(python -c "import importlib.util, os; print(os.path.dirname(importlib.util.find_spec('basicsr').origin))")/data/degradations.py
+
+# TripoSR e Wav2Lip não são pacotes pip
+RUN git clone --depth 1 https://github.com/VAST-AI-Research/TripoSR /opt/TripoSR \
+ && git clone --depth 1 https://github.com/Rudrabha/Wav2Lip /opt/Wav2Lip
+ENV PYTHONPATH=/opt/TripoSR:/app
+
+COPY . .
+RUN bash scripts/download_models.sh models || true
+CMD ["celery", "-A", "taskqueue.celery_app", "worker", "-Q", "gpu", "--concurrency", "1", "--loglevel", "INFO"]
