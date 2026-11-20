@@ -10,11 +10,16 @@ PGBIN=$(ls -d /usr/lib/postgresql/*/bin | tail -1)
 set -a; source $M/env; set +a
 export RUNPOD_POD_ID RUNPOD_API_KEY 2>/dev/null || true
 
-chown -R postgres:postgres $M/pg 2>/dev/null; chmod 700 $M/pg
-rm -f $M/pg/postmaster.pid      # pod parado à força deixa o pid velho
-su postgres -c "$PGBIN/pg_ctl -D $M/pg -l $L/postgres.log -o '-c listen_addresses=127.0.0.1 -c fsync=off -c synchronous_commit=off' -w start"
-su postgres -c "psql -tAc \"select 1 from pg_roles where rolname='motion'\"" | grep -q 1 \
-  || su postgres -c "psql -c \"create user motion password 'motion'\" -c 'create database motion owner motion'"
+# no NFS o root não mexe nos arquivos do postgres: tudo do banco roda como o usuário postgres
+cd /tmp
+su postgres -c "rm -f $M/pgroot/data/postmaster.pid"      # pod parado à força deixa o pid velho
+su postgres -c "$PGBIN/pg_ctl -D $M/pgroot/data -l /tmp/postgres.log -o '-c listen_addresses=127.0.0.1 -c fsync=off -c synchronous_commit=off' -w start"
+if ! su postgres -c "psql -tAc \"select 1 from pg_roles where rolname='motion'\"" | grep -q 1; then
+  su postgres -c "psql" <<'SQL'
+create user motion password 'motion';
+create database motion owner motion encoding 'UTF8' lc_collate 'C.UTF-8' lc_ctype 'C.UTF-8' template template0;
+SQL
+fi
 
 redis-server --port 6379 --bind 127.0.0.1 --dir $M/redis --daemonize yes --logfile $L/redis.log
 nohup rclone serve s3 $M/s3 --addr 127.0.0.1:9000 --auth-key motion,motion-secret --force-path-style=true \

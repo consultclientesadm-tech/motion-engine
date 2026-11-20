@@ -137,7 +137,8 @@ def ensure_bucket_and_lifecycle() -> None:
     except ClientError as e:
         # S3 local (rclone serve s3, moto) pode não implementar lifecycle: segue sem ele
         code = e.response.get("Error", {}).get("Code")
-        if code not in ("NotImplemented", "MethodNotAllowed", "InvalidRequest", "501"):
+        if code not in ("NotImplemented", "MethodNotAllowed", "InvalidRequest", "501",
+                        "BucketAlreadyExists"):  # rclone serve s3 responde isto ao lifecycle
             raise
         log.warning("S3 sem suporte a lifecycle (%s): tmp/ não expira sozinho", code)
 

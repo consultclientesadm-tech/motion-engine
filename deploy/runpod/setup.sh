@@ -54,9 +54,11 @@ except Exception as e: print("rembg:", e)
 PY
 
 # Banco (uma vez)
-if [ ! -s $M/pg/PG_VERSION ]; then
-  mkdir -p $M/pg && chown postgres:postgres $M/pg && chmod 700 $M/pg
-  su postgres -c "$PGBIN/initdb -D $M/pg -A trust -U postgres" >/dev/null
+if [ ! -s $M/pgroot/data/PG_VERSION ]; then
+  # no NFS do volume o root não pode dar chown: a pasta do banco é criada pelo próprio postgres
+  mkdir -p $M/pgroot && chmod 1777 $M/pgroot
+  su postgres -c "mkdir -p $M/pgroot/data && chmod 700 $M/pgroot/data"
+  su postgres -c "$PGBIN/initdb -D $M/pgroot/data -A trust -U postgres -E UTF8 --locale=C.UTF-8" >/dev/null
 fi
 # .env do motor (fora de app/ para um rsync do código não apagar)
 [ -s $M/env ] || cat > $M/env <<ENV

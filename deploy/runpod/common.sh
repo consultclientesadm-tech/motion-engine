@@ -17,3 +17,8 @@ apt_install() {
   fi
 }
 PGBIN=$(ls -d /usr/lib/postgresql/*/bin 2>/dev/null | tail -1 || true)
+# o onnxruntime-gpu (DWPose, rembg) procura libcudnn.so.9 no sistema; ela vem dentro dos pacotes nvidia-* do torch
+if [ -x $M/venv/bin/python ]; then
+  NVLIB=$($M/venv/bin/python -c "import glob,os,nvidia;print(':'.join(sorted(glob.glob(os.path.join(list(nvidia.__path__)[0],'*','lib')))))" 2>/dev/null || true)
+  export LD_LIBRARY_PATH=${NVLIB}${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}
+fi
