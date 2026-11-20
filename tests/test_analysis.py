@@ -1,3 +1,4 @@
+import json
 import math
 
 import numpy as np
@@ -53,6 +54,7 @@ def test_retarget_block_follows_arm():
     assert abs(actor["angles"]["thigh.L"] - 180) < 1e-3
     assert set(out["bones"]) == set(BONES)
     assert actor["face"] is not None and 0 < actor["root"][0] < 1
+    json.dumps(out)  # vai para o Blender como JSON: nada de np.float32
 
 
 def test_untracked_people_are_not_rendered():

@@ -107,7 +107,8 @@ def retarget_actor(kpts: np.ndarray, box: np.ndarray, frame_w: int, frame_h: int
     angles = {}
     for bone, (a, b, _parent) in BONES.items():
         p0, p1 = _kp(kpts, a, min_score), _kp(kpts, b, min_score)
-        angles[bone] = round(sm.angle(bone, image_angle(p0, p1) if p0 is not None and p1 is not None else None), 2)
+        # float(): os pontos vêm em np.float32 e o json.dumps do render não aceita numpy
+        angles[bone] = round(float(sm.angle(bone, image_angle(p0, p1) if p0 is not None and p1 is not None else None)), 2)
 
     hip = _kp(kpts, HIP_MID, min_score)
     if hip is None:  # sem quadril visível: estima pelo meio-baixo da caixa
@@ -126,8 +127,8 @@ def retarget_actor(kpts: np.ndarray, box: np.ndarray, frame_w: int, frame_h: int
         half = 0.07 * scale  # meio-lado da caixa do rosto, relativo à altura
         cu, cv = nose[0] / frame_w, nose[1] / frame_h
         aspect = frame_h / frame_w
-        face = [round(cu - half * aspect, 4), round(cv - half * 1.2, 4),
-                round(cu + half * aspect, 4), round(cv + half * 0.9, 4)]
+        face = [round(float(cu - half * aspect), 4), round(float(cv - half * 1.2), 4),
+                round(float(cu + half * aspect), 4), round(float(cv + half * 0.9), 4)]
     return {"root": [round(float(root[0]), 4), round(float(root[1]), 4)],
             "scale": round(float(scale), 4), "angles": angles, "face": face}
 
