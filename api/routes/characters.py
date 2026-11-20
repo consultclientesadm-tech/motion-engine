@@ -13,7 +13,9 @@ from db.session import get_session
 
 router = APIRouter()
 
-ALLOWED = {".png", ".jpg", ".jpeg", ".webp", ".wav", ".mp3", ".flac", ".m4a"}
+# vídeo também: é o jeito de pôr o clipe no bucket para usar em JobIn.video_url
+ALLOWED = {".png", ".jpg", ".jpeg", ".webp", ".wav", ".mp3", ".flac", ".m4a",
+           ".mp4", ".mov", ".mkv", ".webm"}
 
 
 def _out(c: Character) -> CharacterOut:
@@ -24,7 +26,7 @@ def _out(c: Character) -> CharacterOut:
 
 @router.post("/upload")
 async def upload(file: UploadFile = File(...)):
-    """Sobe uma folha (imagem) ou amostra de voz e devolve a URL s3:// para usar no JobIn."""
+    """Sobe uma folha (imagem), amostra de voz ou o vídeo e devolve a URL s3:// para usar no JobIn."""
     from storage import s3
     ext = Path(file.filename or "").suffix.lower()
     if ext not in ALLOWED:
