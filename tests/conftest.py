@@ -32,6 +32,7 @@ def client(db, monkeypatch):
     queued: list[str] = []
     monkeypatch.setattr(jobs, "enqueue_job", queued.append)
     monkeypatch.setattr(jobs, "revoke", lambda task_id: None)
+    monkeypatch.setattr(jobs, "job_is_locked", lambda job_id: True)
     with TestClient(app) as c:
         c.queued = queued
         yield c

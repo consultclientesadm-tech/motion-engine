@@ -26,6 +26,11 @@ def revoke(task_id: str | None) -> None:
         app.control.revoke(task_id)  # sem terminate: o worker para sozinho no próximo bloco
 
 
+def job_is_locked(job_id: str) -> bool:
+    from taskqueue.tasks import is_locked  # import tardio: testes trocam esta função
+    return is_locked(job_id)
+
+
 def to_status(job: Job) -> JobStatus:
     output_url = None
     if job.output_key and job.state == JobState.done:
@@ -132,9 +137,12 @@ def cancel_job(job_id: str, session: Session = Depends(get_session)):
 
 @router.post("/{job_id}/resume", response_model=JobStatus)
 def resume_job(job_id: str, payload: ResumeIn | None = None, session: Session = Depends(get_session)):
-    """Retoma do último bloco salvo. Use após paused_budget (com teto maior), failed ou cancelled."""
+    """Retoma do último bloco salvo. Use após paused_budget (com teto maior), failed, cancelled
+    ou quando o worker morreu no meio (estado ativo sem trava no Redis)."""
     job = _get(session, job_id)
-    if job.state in ACTIVE_STATES:
+    # Em andamento só se algum worker segura a trava. Estado ativo sem trava (fora
+    # "queued", que ainda espera na fila) = o worker morreu no meio: pode retomar.
+    if job.state in ACTIVE_STATES and (job.state == JobState.queued or job_is_locked(job.id)):
         raise HTTPException(409, f"job já está em andamento ({job.state.value})")
     if job.state == JobState.done:
         raise HTTPException(409, "job já terminou")

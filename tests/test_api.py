@@ -20,6 +20,20 @@ def test_create_get_cancel_resume(client):
     assert client.queued == [job["id"], job["id"]]
 
 
+def test_resume_after_worker_died(client, monkeypatch):
+    """Worker morreu no meio do render: estado ativo, mas sem trava no Redis."""
+    from api.routes import jobs
+    from db.models import Job, JobState
+    from db.session import session_scope
+    job = client.post("/jobs", json=payload()).json()
+    with session_scope() as s:
+        s.get(Job, job["id"]).state = JobState.rendering
+    assert client.post(f"/jobs/{job['id']}/resume").status_code == 409  # trava viva
+    monkeypatch.setattr(jobs, "job_is_locked", lambda job_id: False)
+    r = client.post(f"/jobs/{job['id']}/resume")
+    assert r.status_code == 200 and r.json()["state"] == "queued"
+
+
 def test_reject_when_estimate_exceeds_job_budget(client):
     r = client.post("/jobs", json=payload(duration_s=3 * 3600))
     assert r.status_code == 402
